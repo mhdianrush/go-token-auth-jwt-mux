@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 	"github.com/mhdianrush/go-token-auth-jwt-mux/config"
 	"github.com/mhdianrush/go-token-auth-jwt-mux/controllers"
 	"github.com/mhdianrush/go-token-auth-jwt-mux/middlewares"
@@ -14,15 +15,15 @@ import (
 func main() {
 	config.ConnectDB()
 
-	r := mux.NewRouter()
+	routes := mux.NewRouter()
 
-	r.HandleFunc("/login", controllers.Login).Methods(http.MethodPost)
-	r.HandleFunc("/register", controllers.Register).Methods(http.MethodPost)
-	r.HandleFunc("/logout", controllers.Logout).Methods(http.MethodGet)
+	routes.HandleFunc("/login", controllers.Login).Methods(http.MethodPost)
+	routes.HandleFunc("/register", controllers.Register).Methods(http.MethodPost)
+	routes.HandleFunc("/logout", controllers.Logout).Methods(http.MethodGet)
 
 	// this route will be protect with middleware
 	// if user isn't login, it will return an unauthorized response.
-	api := r.PathPrefix("/api").Subrouter()
+	api := routes.PathPrefix("/api").Subrouter()
 	api.HandleFunc("/products", controllers.Index).Methods(http.MethodGet)
 
 	// use middleware
@@ -32,18 +33,21 @@ func main() {
 
 	file, err := os.OpenFile("application.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
-		panic(err)
+		logger.Printf("failed create log file %s", err.Error())
 	}
 	logger.SetOutput(file)
 
-	logger.Println("Server Running on Port 8080")
+	if err := godotenv.Load(); err != nil {
+		logger.Printf("failed load env file %s", err.Error())
+	}
 
 	server := http.Server{
-		Addr:    ":8080",
-		Handler: r,
+		Addr:    ":" + os.Getenv("SERVER_PORT"),
+		Handler: routes,
 	}
-	err = server.ListenAndServe()
-	if err != nil {
-		panic(err)
+	if err = server.ListenAndServe(); err != nil {
+		logger.Printf("failed connect to server %s", err.Error())
 	}
+
+	logger.Printf("server running on port %s", os.Getenv("SERVER_PORT"))
 }
